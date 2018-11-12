@@ -1,22 +1,22 @@
 /**
  * HDB Dimmer
- * 
+ *
  * Implements a simple dimmer for the onboard led. Light intensity can be
- * commanded from the FABtotum user interface.
- * 
+ * commanded from the FABtotum Jog page.
+ *
  * Compatible with:
- * 
+ *
  *  Arduino Nano-like boards sporting an ATmega 168/328 microcontroller
  */
 
 /**
  * Wiring
- * 
+ *
  * See wiring.png for wiring diagram to an Arduino Nano v3
  *
  * Possible wirings (Nano <-> HDB <-> TOTUMduino) and corresponding
- * FABlin configuration parameters:
- * 
+ * FABlin serial configuration parameters:
+ *
  *  Nano    HDB
  * -------------
  *  +5V <-> ARDUINO +
@@ -26,7 +26,7 @@
  *                |   |
  *                v   v
  *      M575  P4 R11 T20 B...
- * 
+ *
  *  Nano    HDB
  * -------------
  *  +5V <-> ARDUINO +
@@ -40,52 +40,62 @@
 
 /**
  * Steps to run:
- * 
- * - Flash this sketch to your board.
- * 
- * - Wire your board to the HDB and install on your FABtotum.
- * 
- * - Inside FAB-UI jog page:
- * 
- *   Set a custom head id for your head:
- * 
+ *
+ * - Flash this sketch to your board and wire it to your HDB according to
+ *   the diagrams above.
+ *
+ * - In FAB-UI's jog page enter the following commands:
+ *
+ *     M793 S0
+ *
+ *   These will disable the current head and temperature management
+ *   for the default tool configuration
+ *
+ * - You can now physically uninstall the current head and swap it with
+ *   the HDB in a safe way
+ *
+ * - Set a custom head id for your head, e.g.:
+ *
  *     M793 S100
- * 
- *   with any number equal to 100 or above.
- * 
- *   Enable communication for the default head:
- * 
+ *
+ * - Enable communication for the default tool:
+ *
  *     M563 P0 S1
- * 
- *   Configure communication parameters
- * 
+ *
+ * - Configure communication parameters
+ *
  *     M575 P4 R<rx_pin> T<tx_pin> B<BAUDRATE>
- * 
+ *
  *   where:
- * 
+ *
  *     <rx_pin>, <tx_pin> depend on the Nano-HDB wiring (refer to Wiring)
  *     <BAUDRATE> is as #define'd later in this sketch (refer to Configuration)
- *  
- *   Send a command:
- * 
+ *
+ * - Send a command:
+ *
  *     M790 P4 "<cmd>"
- * 
+ *
  *   where <cmd> is any of:
- * 
+ *
  *     0-9 to set led's intensity
  *     +/- to increment/decrement led's intensity
+ *
+ *
+ * Pro tip:
+ *
+ * In FAB-UI/Colibri, you can automate the above procedure by defining a custom head.
  */
 
 /**
  * Configuration
- * 
+ *
  * You can change the desired communication baudrate and customize your
  * led's pin number.
- * 
+ *
  * Available baud rates:
- * 
+ *
  *  300 600 1200 2400 4800 9600 14400 19200 28800 31250 38400 57600
- * 
+ *
  * Suggested rates fall between 9600 and 38400.
  */
 
@@ -111,16 +121,23 @@
 
 #if (sRX != 0) || (sTX != 1)
    #include <SoftwareSerial.h>
-   #define Serial softSerial
+   #define Main    softSerial
+   #define Monitor Serial
 
-   SoftwareSerial softSerial(sRX, sTX);
+   SoftwareSerial Main(sRX, sTX);
+#else
+   #define Main Serial
 #endif
 
 void setup ()
 {
    pinMode(LED, OUTPUT);
 
-   Serial.begin(BAUDRATE);
+   Main.begin(BAUDRATE);
+#ifdef Monitor
+   Monitor.begin(9600);
+   Monitor.println("start");
+#endif
 }
 
 void loop ()
@@ -140,9 +157,14 @@ void loop ()
       digitalWrite(LED,0);
    }
 
-   while (Serial.available())
+   while (Main.available())
    {
-      register unsigned char chin = Serial.read();
+      register unsigned char chin = Main.read();
+#ifdef Monitor
+      Monitor.write("rx ");
+      Monitor.write(chin);
+      Monitor.println("");
+#endif
       switch (chin)
       {
          case '+':
@@ -163,5 +185,7 @@ void loop ()
                power = 28 * (chin - '0');
             }
       }
+
+      Main.println(power);
    }
 }
